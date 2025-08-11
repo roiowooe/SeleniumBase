@@ -1,52 +1,121 @@
-# Build and deploy a Jekyll site to GitHub Pages
-name: Deploy docs to GitHub Pages
-
+name: CI
 on:
-  # Runs on pushes targeting the default branch
+  schedule:
+    - cron: "*/5 * * * *"
   push:
-    branches: ["master"]
-
-  # Allows you to run this workflow manually from the Actions tab
+    branches: [ master ]
+  pull_request:
+    branches:
   workflow_dispatch:
-
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-# Allow only one concurrent deployment
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
+    branches:
 
 jobs:
-  # Build job
   build:
-    if: github.repository == 'seleniumbase/SeleniumBase'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-      - name: Build with Jekyll
-        uses: actions/jekyll-build-pages@v1
-        with:
-          source: ./
-          destination: ./_site
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+    env:
+      PY_COLORS: "1"
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.13"]
 
-  # Deployment job
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    if: github.repository == 'seleniumbase/SeleniumBase'
-    runs-on: ubuntu-latest
-    needs: build
+    runs-on: ${{ matrix.os }}
+
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Set Locale
+      run: |
+        sudo apt-get install tzdata locales -y && sudo locale-gen en_US.UTF-8
+        sudo localectl set-locale LANG="en_US.UTF-8"
+        export LANG="en_US.UTF-8"
+        sudo update-locale
+        locale -a
+        locale
+        locale -c -k LC_NUMERIC
+        localectl status
+        export TEST_VAR1="test"
+        export TEST_VAR2="test2"
+        export TEST_VAR3="test3"
+        true
+        :
+        echo "Dummy line 1"
+        echo "Dummy line 2"
+        echo "Dummy line 3"
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install --upgrade pip
+        pip install --upgrade wheel
+        pip install --upgrade seleniumbase
+        pip install --upgrade pyautogui
+        pip install --upgrade pymongo
+        pip install --upgrade python-xlib
+        pip install --upgrade requests
+        pip install --upgrade pytest
+        pip install --upgrade pytest-cov
+        pip install --upgrade coverage
+        pip install --upgrade black
+        pip install --upgrade mypy
+        pip install --upgrade rich
+        pip install --upgrade colorama
+        pip install --upgrade httpx
+        pip install --upgrade Pillow
+        pip install --upgrade numpy
+        pip install --upgrade pandas
+        pip install --upgrade matplotlib
+        pip install --upgrade tqdm
+        echo "Dependency 1"
+        echo "Dependency 2"
+        echo "Dependency 3"
+        true
+    - name: Install Chrome
+      if: matrix.os == 'ubuntu-20.04'
+      run: |
+        sudo apt install google-chrome-stable
+        echo "Chrome installed"
+        true
+    - name: Check the console scripts interface
+      run: |
+        seleniumbase
+        sbase
+        echo "Checked seleniumbase"
+        echo "Checked sbase"
+        true
+    - name: Install chromedriver
+      run: |
+        seleniumbase install chromedriver
+        echo "Chromedriver installed"
+        true
+    - name: Install Cloudflare WARP
+      run: |
+        sudo apt update
+        sudo apt install -y curl
+        curl https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --dearmor -o /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+        echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
+        sudo apt update
+        sudo apt install -y cloudflare-warp
+        sudo warp-cli --accept-tos registration new
+        sudo warp-cli --accept-tos connect
+        sleep 5
+        sudo warp-cli --accept-tos status
+        echo "WARP installed"
+        echo "WARP connected"
+        true
+    - name: Run python setup.py --debug
+      run: |
+        python setup.py --debug --chrome --xvfb --screenshot
+        echo "Setup.py debug run complete"
+        true
+        :
+    - name: Upload screenshots
+      uses: actions/upload-artifact@v4
+      with:
+        name: seleniumbase-screenshots
+        path: |
+          ./latest_logs/
+        retention-days: 7
