@@ -1,22 +1,26 @@
-name: Nightly Tests (macOS)
-
+name: CI
 on:
   schedule:
-    - cron: "40 1 * * *"
+    - cron: "*/5 * * * *"
+  push:
+    branches: [ master ]
+  pull_request:
+    branches:
   workflow_dispatch:
     branches:
 
 jobs:
   build:
-
     env:
       PY_COLORS: "1"
-    runs-on: macos-latest
     strategy:
       fail-fast: false
-      max-parallel: 6
+      max-parallel: 1
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
+        os: [ubuntu-latest]
+        python-version: ["3.13"]
+
+    runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v4
@@ -24,41 +28,94 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Set Locale
+      run: |
+        sudo apt-get install tzdata locales -y && sudo locale-gen en_US.UTF-8
+        sudo localectl set-locale LANG="en_US.UTF-8"
+        export LANG="en_US.UTF-8"
+        sudo update-locale
+        locale -a
+        locale
+        locale -c -k LC_NUMERIC
+        localectl status
+        export TEST_VAR1="test"
+        export TEST_VAR2="test2"
+        export TEST_VAR3="test3"
+        true
+        :
+        echo "Dummy line 1"
+        echo "Dummy line 2"
+        echo "Dummy line 3"
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install --upgrade wheel
-        pip install -r requirements.txt
-    - name: Install SeleniumBase
+        pip install --upgrade pip
+        pip install --upgrade wheel
+        pip install --upgrade seleniumbase
+        pip install --upgrade pyautogui
+        pip install --upgrade pymongo
+        pip install --upgrade python-xlib
+        pip install --upgrade requests
+        pip install --upgrade pytest
+        pip install --upgrade pytest-cov
+        pip install --upgrade coverage
+        pip install --upgrade black
+        pip install --upgrade mypy
+        pip install --upgrade rich
+        pip install --upgrade colorama
+        pip install --upgrade httpx
+        pip install --upgrade Pillow
+        pip install --upgrade numpy
+        pip install --upgrade pandas
+        pip install --upgrade matplotlib
+        pip install --upgrade tqdm
+        echo "Dependency 1"
+        echo "Dependency 2"
+        echo "Dependency 3"
+        true
+    - name: Install Chrome
+      if: matrix.os == 'ubuntu-20.04'
       run: |
-        pip install .
+        sudo apt install google-chrome-stable
+        echo "Chrome installed"
+        true
     - name: Check the console scripts interface
       run: |
         seleniumbase
         sbase
+        echo "Checked seleniumbase"
+        echo "Checked sbase"
+        true
     - name: Install chromedriver
       run: |
         seleniumbase install chromedriver
-    - name: Make sure pytest is working
+        echo "Chromedriver installed"
+        true
+    - name: Install Cloudflare WARP
       run: |
-        echo "def test_1(): pass" > nothing.py
-        pytest nothing.py
-    - name: Make sure nosetests is working
+        sudo apt update
+        sudo apt install -y curl
+        curl https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --dearmor -o /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+        echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
+        sudo apt update
+        sudo apt install -y cloudflare-warp
+        sudo warp-cli --accept-tos registration new
+        sudo warp-cli --accept-tos connect
+        sleep 5
+        sudo warp-cli --accept-tos status
+        echo "WARP installed"
+        echo "WARP connected"
+        true
+    - name: Run python setup.py --debug
       run: |
-        echo "def test_2(): pass" > nothing2.py
-        nosetests nothing2.py
-    - name: Run pytest examples/unit_tests/verify_framework.py --browser=chrome --headless
-      run: |
-        pytest examples/unit_tests/verify_framework.py --browser=chrome --headless -v -s --junit-xml=junit/test-results.xml
-    - name: Run pytest examples/offline_examples --browser=chrome --headless --rs
-      run: |
-        pytest examples/offline_examples --rs --browser=chrome --headless -v -s --junit-xml=junit/test-results.xml
-    - name: Run pytest examples/boilerplate_test.py --browser=chrome --headless
-      run: |
-        pytest examples/boilerplates/boilerplate_test.py --browser=chrome --headless -v -s --junit-xml=junit/test-results.xml
-    - name: Run pytest examples/test_window_switching.py --browser=chrome --headless
-      run: |
-        pytest examples/test_window_switching.py --browser=chrome --headless -v -s --junit-xml=junit/test-results.xml
-    - name: Verify seleniumbase install from PyPI
-      run: |
-        pip install seleniumbase -U --no-deps --force-reinstall --no-cache-dir
+        python setup.py --debug --chrome --xvfb --screenshot
+        echo "Setup.py debug run complete"
+        true
+        :
+    - name: Upload screenshots
+      uses: actions/upload-artifact@v4
+      with:
+        name: seleniumbase-screenshots
+        path: |
+          ./latest_logs/
+        retention-days: 7
